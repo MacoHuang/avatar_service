@@ -29,11 +29,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 def get_ai_response(user_id: str, user_msg: str):
-    # [A] 確保客戶存在並抓取「業務筆記」
-    supabase.table("clients_profile").upsert(
-        {"line_user_id": user_id}, on_conflict="line_user_id"
-    ).execute()
-    
+    # [A] 抓取「業務筆記」    
     notes_data = supabase.table("clients_profile").select("agent_notes").eq("line_user_id", user_id).execute()
     agent_notes = notes_data.data[0].get("agent_notes") if notes_data.data else "目前無備註。"
 
@@ -121,6 +117,12 @@ def get_ai_response(user_id: str, user_msg: str):
 def handle_message(event):
     user_id = event.source.user_id
     user_msg = event.message.text
+    
+    # 確保客戶存在 (解決 Foreign Key Constraint 錯誤)
+    supabase.table("clients_profile").upsert(
+        {"line_user_id": user_id}, on_conflict="line_user_id"
+    ).execute()
+
     supabase.table("chat_history").insert({"user_id": user_id, "role": "user", "content": user_msg}).execute()
     ai_reply = get_ai_response(user_id, user_msg)
     supabase.table("chat_history").insert({"user_id": user_id, "role": "model", "content": ai_reply}).execute()
